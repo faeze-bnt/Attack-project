@@ -1,0 +1,21 @@
+# Attack-project
+
+There is 2 sub-project here:
+
+group 1:
+  l0_attack
+  l2_attack
+  li_attack
+  setup_cifar
+  setup_inception
+  setup_mnist
+  test_attack
+  train_models
+  verify
+  
+group 2:
+  MyConv2D_layer
+  MyDense_layer
+  Run_This
+  Stochastic
+  my_LeNet5_best
