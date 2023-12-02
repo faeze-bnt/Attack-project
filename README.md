@@ -1,6 +1,9 @@
 # Attack-project
 
-There is 2 sub-project here:
+for the latest version of code, run Run_This.
+-------
+
+There are 2 sub-project here:
 
 group 1:
   l0_attack
