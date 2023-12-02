@@ -5,17 +5,10 @@
 ## This program is licenced under the BSD 2-Clause licence,
 ## contained in the LICENCE file in this directory.
 
+import random
 import tensorflow as tf
 import numpy as np
-import time
 
-from setup_cifar import CIFAR, CIFARModel
-from setup_mnist import MNIST, MNISTModel
-from setup_inception import ImageNet, InceptionModel
-
-from l2_attack import CarliniL2
-from l0_attack import CarliniL0
-from li_attack import CarliniLi
 
 # Enable XLA devices
 tf.config.optimizer.set_jit(True)
@@ -32,7 +25,7 @@ def show(img):
         print("".join([remap[int(round(x))] for x in img[i*28:i*28+28]]))
 
 
-def generate_data(data, samples, targeted=True, start=0, inception=False):
+def generate_data(test_data, test_labels, samples, targeted=True, start=0, inception=False):
     """
     Generate the input data to the attack algorithm.
 
@@ -49,45 +42,24 @@ def generate_data(data, samples, targeted=True, start=0, inception=False):
             if inception:
                 seq = random.sample(range(1,1001), 10)
             else:
-                seq = range(data.test_labels.shape[1])
+                seq = range(test_labels.shape[1])
 
             for j in seq:
-                if (j == np.argmax(data.test_labels[start+i])) and (inception == False):
+                if (j == np.argmax(test_labels[start+i])) and (inception == False):
                     continue
-                inputs.append(data.test_data[start+i])
-                targets.append(np.eye(data.test_labels.shape[1])[j])
+                inputs.append(test_data[start+i])
+                targets.append(np.eye(test_labels.shape[1])[j])
+            print(seq)
+            print(start+i)
+            print(test_labels[start+i])
+            print(len(inputs))
+            
         else:
-            inputs.append(data.test_data[start+i])
-            targets.append(data.test_labels[start+i])
+            inputs.append(test_data[start+i])
+            targets.append(test_labels[start+i])
 
     inputs = np.array(inputs)
     targets = np.array(targets)
 
     return inputs, targets
 
-
-if __name__ == "__main__":
-    with tf.compat.v1.Session() as sess:
-        data, model =  MNIST(), MNISTModel("models/mnist.h5", sess)
-        #data, model =  CIFAR(), CIFARModel("models/cifar", sess)
-        attack = CarliniL2(sess, model, batch_size=9, max_iterations=1000, confidence=0)
-        #attack = CarliniL0(sess, model, max_iterations=1000, initial_const=10,
-        #                   largest_const=15)
-
-        inputs, targets = generate_data(data, samples=1, targeted=True,
-                                        start=0, inception=False)
-        timestart = time.time()
-        adv = attack.attack(inputs, targets)
-        timeend = time.time()
-        
-        print("Took",timeend-timestart,"seconds to run",len(inputs),"samples.")
-
-        for i in range(len(adv)):
-            print("Valid:")
-            show(inputs[i])
-            print("Adversarial:")
-            show(adv[i])
-            
-            print("Classification:", model.model.predict(adv[i:i+1]))
-
-            print("Total distortion:", np.sum((adv[i]-inputs[i])**2)**.5)
