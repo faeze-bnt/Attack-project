@@ -18,7 +18,8 @@ CONFIDENCE = 0           # how strong the adversarial example should be
 INITIAL_CONST = 1e-3     # the initial constant c to pick as a first guess
 
 class CarliniL2:
-    def __init__(self, sess, model, batch_size=1, confidence = CONFIDENCE,
+    def __init__(self, sess, model, image_size, num_channels, num_labels,
+                 batch_size=1, confidence = CONFIDENCE,
                  targeted = TARGETED, learning_rate = LEARNING_RATE,
                  binary_search_steps = BINARY_SEARCH_STEPS, max_iterations = MAX_ITERATIONS,
                  abort_early = ABORT_EARLY, 
@@ -51,7 +52,7 @@ class CarliniL2:
         boxmax: Maximum pixel value (default 0.5).
         """
 
-        image_size, num_channels, num_labels = model.image_size, model.num_channels, model.num_labels
+        #image_size, num_channels, num_labels = model.image_size, model.num_channels, model.num_labels
         self.sess = sess
         self.TARGETED = targeted
         self.LEARNING_RATE = learning_rate
@@ -85,13 +86,10 @@ class CarliniL2:
         self.boxmul = (boxmax - boxmin) / 2.
         self.boxplus = (boxmin + boxmax) / 2.
         self.newimg = tf.tanh(modifier + self.timg) * self.boxmul + self.boxplus
-        
-        print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
-        print((self.newimg.shape))
-        print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
-        
+
         # prediction BEFORE-SOFTMAX of the model
         self.output = model.predict(self.newimg)
+        # self.output = model(self.newimg)
         
         # distance to the input data
         self.l2dist = tf.reduce_sum(tf.square(self.newimg-(tf.tanh(self.timg) * self.boxmul + self.boxplus)),[1,2,3])
@@ -160,7 +158,13 @@ class CarliniL2:
                 return x != y
 
         batch_size = self.batch_size
-
+        
+        if np.any(((imgs - self.boxplus) / self.boxmul * 0.999999) > 1):
+            #print(((imgs - self.boxplus) / self.boxmul * 0.999999))
+            print("1  ========================================================================================")
+        elif  np.any(((imgs - self.boxplus) / self.boxmul * 0.999999) < -1):
+            print("-1  ========================================================================================")
+        print(self.boxplus, self.boxmul)
         # convert to tanh-space
         imgs = np.arctanh((imgs - self.boxplus) / self.boxmul * 0.999999)
 
@@ -173,7 +177,7 @@ class CarliniL2:
         o_bestl2 = [1e10]*batch_size
         o_bestscore = [-1]*batch_size
         o_bestattack = [np.zeros(imgs[0].shape)]*batch_size
-        
+
         for outer_step in range(self.BINARY_SEARCH_STEPS):
             print(o_bestl2)
             # completely reset adam's internal state.
