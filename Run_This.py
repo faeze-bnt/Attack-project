@@ -19,8 +19,8 @@ import time
 
 batch_size = 64
 num_classes = 10
-epochs = 1 #40
-train_samples=60000
+epochs = 50
+train_samples=100 #60000
 test_samples=10000
 params = [20, 20, 800, 10, 10]
 
@@ -31,7 +31,7 @@ filename_keras = '.keras'
 
 #train_1_test_2 = 1
 
-#params = [20, 20, 800, 10, 10]
+
 
 # input image dimensions
 img_rows, img_cols = 28, 28
@@ -85,14 +85,16 @@ def train_main(data, train_1_test_2, is_SC, params):
 
     if is_SC==True:
 
-        model.add(MyConv2D(filters=params[0], kernel=(5, 5), Method = 'Stoch', Width = 8, Sobol_num1 = 1, Sobol_num2 = 4, Stream_Length = 16, input_shape=input_shape))		 
+        model.add(MyConv2D(filters=params[0], kernel=(5, 5), Method = 'Float', Width = 8, Sobol_num1 = 1, 
+                           Sobol_num2 = 4, Stream_Length = 16, input_shape=input_shape))		#used to be Stoch 
         model.add(MaxPooling2D(pool_size=(2, 2)))
-        model.add(MyConv2D(filters=params[1], kernel=(5, 5), Method = 'Fixed', Width = 8, Sobol_num1 = 2, Sobol_num2 = 4, Stream_Length = 64))			        #used to be Fixed	
+        model.add(MyConv2D(filters=params[1], kernel=(5, 5), Method = 'Float', Width = 8, Sobol_num1 = 2, 
+                           Sobol_num2 = 4, Stream_Length = 64))			        #used to be Fixed	
         model.add(MaxPooling2D(pool_size=(2, 2)))
         model.add(Flatten())
-        model.add(MyDense(filters=params[2], Bias=True, Method = 'Fixed', WidthIn=8, WidthOut=8, Str_Len=256))                                                #used to be Fixed
+        model.add(MyDense(filters=params[2], Bias=True, Method = 'Float', WidthIn=8, WidthOut=8, Str_Len=256))                                                #used to be Fixed
         model.add(Activation('relu'))
-        model.add(MyDense(filters=params[3], Bias=True, Method = 'Fixed',  WidthIn=8, WidthOut=8, Str_Len=256))                                                #used to be Fixed
+        model.add(MyDense(filters=params[3], Bias=True, Method = 'Float',  WidthIn=8, WidthOut=8, Str_Len=256))                                                #used to be Fixed
         model.add(Activation('relu'))
         model.add(MyDense(filters=num_classes, Bias=True, Method = 'Float',  WidthIn=8, WidthOut=8, Str_Len=256))                                                #used to be Fixed
         model.add(Activation('softmax'))
@@ -104,13 +106,14 @@ def train_main(data, train_1_test_2, is_SC, params):
     
     elif is_SC==False:
 
-        model.add(Conv2D(params[0], (5, 5), activation='relu', use_bias=True, bias_initializer='RandomNormal', input_shape=input_shape))
+        model.add(Conv2D(params[0], (5, 5), activation='relu', use_bias=True, bias_initializer='RandomNormal', 
+                         input_shape=input_shape))
         model.add(MaxPooling2D(pool_size=(2, 2)))
         model.add(Conv2D(params[1], (5, 5), activation='relu', use_bias=True, bias_initializer='RandomNormal'))
         model.add(MaxPooling2D(pool_size=(2, 2)))
         model.add(Flatten())
         model.add(Dense(params[2], input_dim=320, activation='relu', use_bias=True, bias_initializer='RandomNormal'))
-        #model.add(Dense(params[3], input_dim=800, activation='relu', use_bias=True, bias_initializer='RandomNormal'))
+        model.add(Dense(params[3], input_dim=800, activation='relu', use_bias=True, bias_initializer='RandomNormal'))
         model.add(Dense(num_classes, activation='softmax', use_bias=True, bias_initializer='RandomNormal'))
 
         #----Saving the best training weights 'my_LeNet5_best_.h5'
@@ -127,11 +130,12 @@ def train_main(data, train_1_test_2, is_SC, params):
 
         #----options for monitor: 'val_loss', 'val_accuracy', ...(it seems that 'val_accuracy' works better for SC)
         model_saver_best = tf.keras.callbacks.ModelCheckpoint(filepath, monitor='val_accuracy', verbose=1, 
-                                                            save_best_only=True, mode='auto', save_weights_only=True, save_freq='epoch') 
+                                                            save_best_only=True, mode='auto', save_weights_only=True, 
+                                                            save_freq='epoch') 
                                                             #options=tf.train.CheckpointOptions()) ,   save_freq=5*batch_size   , period=1
         model.fit(x_train, y_train,	batch_size=batch_size, epochs=epochs, verbose=1, validation_data=(x_test, y_test),callbacks=[model_saver_best])
-        #model.summary()
-        model.save(savepath)
+        model.summary()
+        # model.save(savepath)
 
             
     
@@ -139,6 +143,9 @@ def train_main(data, train_1_test_2, is_SC, params):
         #----only for inference
         model.load_weights(filepath)
         print("Weigths are loaded from disk")
+        test_loss, test_acc = model.evaluate(x_test, y_test)
+        print("we are in SC:", is_SC)
+        print(f'Test accuracy: {test_acc}, Test loss: {test_loss}')
 
 
     #----for both train and inference	
@@ -158,36 +165,45 @@ def attack_main(input_shape, test_data, test_labels, batch_size=9, max_iteration
     if is_SC:
         model_name = filename_best_sc + filename_keras
     else:
-        model_name = filename_best + filename_keras
+        model_name = filename_best + filename_h5 # filename_keras
 
-    with tf.compat.v1.Session() as sess:
+    # with tf.compat.v1.Session() as sess:
 
         #loaded_model = tf.keras.saving.load_model(model_name, compile=True)
-        model_name = filename_best + filename_keras
-        model = Sequential()
+    model_name = filename_best + filename_keras
+    model = Sequential()
 
-        model.add(Conv2D(params[0], (5, 5), activation='relu', use_bias=True, bias_initializer='RandomNormal'))
-        model.add(MaxPooling2D(pool_size=(2, 2)))
-        model.add(Conv2D(params[1], (5, 5), activation='relu', use_bias=True, bias_initializer='RandomNormal'))
-        model.add(MaxPooling2D(pool_size=(2, 2)))
-        model.add(Flatten())
-        model.add(Dense(params[2], input_dim=320, activation='relu', use_bias=True, bias_initializer='RandomNormal'))
-        #model.add(Dense(params[3], input_dim=800, activation='relu', use_bias=True, bias_initializer='RandomNormal'))
-        model.add(Dense(num_classes, activation='softmax', use_bias=True, bias_initializer='RandomNormal'))
+    model.add(Conv2D(params[0], (5, 5), activation='relu', use_bias=True, bias_initializer='RandomNormal', 
+                     input_shape=input_shape))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+    model.add(Conv2D(params[1], (5, 5), activation='relu', use_bias=True, bias_initializer='RandomNormal'))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+    model.add(Flatten())
+    model.add(Dense(params[2], input_dim=320, activation='relu', use_bias=True, bias_initializer='RandomNormal'))
+    model.add(Dense(params[3], input_dim=800, activation='relu', use_bias=True, bias_initializer='RandomNormal'))
+    model.add(Dense(num_classes, activation='softmax', use_bias=True, bias_initializer='RandomNormal'))
 
-        #model.compile(loss=losses.CategoricalCrossentropy(), optimizer=tf.keras.optimizers.Adam(), metrics=['accuracy'])
-        model.build((batch_size, img_rows, img_cols, num_channels))  # Replace with your model's input shape, None is for batch size
-        
-        print("Weigths are NOOOOT loaded from disk") 
-        model.load_weights(model_name)
-        print("Weigths are loaded from disk")
+    #model.compile(loss=losses.CategoricalCrossentropy(), optimizer=tf.keras.optimizers.Adam(), metrics=['accuracy'])
+    model.build((batch_size, img_rows, img_cols, num_channels))  # Replace with your model's input shape, None is for batch size
+    
+    print("Weigths are NOOOOT loaded from disk") 
+    model.load_weights(model_name)
+    print("Weigths are loaded from disk")
+
+    model.summary()
+
+    with tf.compat.v1.Session() as sess:
 
         attack = CarliniL2(sess, model, image_size, num_channels, num_labels,
                            batch_size, max_iterations, confidence)
 
-        inputs, targets = test_attack.generate_data(test_data, test_labels, samples=1, targeted=False, #true
+        inputs, targets = test_attack.generate_data(test_data, test_labels, samples=1, targeted=True, #true
                                         start=0, inception=False)
 
+        # print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+        # print((inputs.shape))
+        # print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+        
         timestart = time.time()
         adv = attack.attack(inputs, targets)
         timeend = time.time()
@@ -209,15 +225,18 @@ def attack_main(input_shape, test_data, test_labels, batch_size=9, max_iteration
 data_set = load_MNIST_data()
 print("done 1 : data loaded -----------------------")
 
-#first train the stochastic model
-#train_main(data_set, train_1_test_2=1, is_SC=True, params=params)
-print("done 2 : SC trained -----------------------")
+# #first train the stochastic model
+# train_main(data_set, train_1_test_2=1, is_SC=True, params=params)
+# print("done 2 : SC trained -----------------------")
 
-#now train the binary Lenet model
-train_main(data_set, train_1_test_2=1, is_SC=False, params=params)
-print("done 3 : nn trained -----------------------")
+# #now train the binary Lenet model
+# train_main(data_set, train_1_test_2=1, is_SC=False, params=params)
+# print("done 3 : nn trained -----------------------")
 
-#apply attack
-_, _, test_data, test_labels, shape_= data_set
-attack_main(shape_, test_data, test_labels, is_SC=False)
+
+train_main(data_set, train_1_test_2=2, is_SC=True, params=params)
+train_main(data_set, train_1_test_2=2, is_SC=False, params=params)
+# #apply attack
+# _, _, test_data, test_labels, shape_= data_set
+# attack_main(shape_, test_data, test_labels, is_SC=False)
 
