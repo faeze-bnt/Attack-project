@@ -20,8 +20,8 @@ import time
 batch_size = 64
 num_classes = 10
 epochs = 50
-train_samples=100 #60000
-test_samples=10000
+train_samples=500 #60000
+test_samples=100 #10000
 params = [20, 20, 800, 10, 10]
 
 filename_best_sc = 'my_LeNet5_best_SC'
@@ -36,7 +36,19 @@ filename_keras = '.keras'
 # input image dimensions
 img_rows, img_cols = 28, 28
 
-def load_MNIST_data():
+
+def introduce_random_errors(images, error_rate=0.05):    
+    noisy_images = images.copy()
+    for img in noisy_images:        # Number of pixels to alter
+        num_errors = int(error_rate * img.size)        
+        for _ in range(num_errors):
+            # Randomly choose a pixel and change its value            
+            x, y = np.random.randint(0, img.shape[0]), np.random.randint(0, img.shape[1])
+            img[x, y] = np.random.randint(0, 256)    
+    return noisy_images
+        
+
+def load_MNIST_data(error=False):
     
     # the data, split between train and test sets
     (x_train, y_train), (x_test, y_test) = mnist.load_data()
@@ -56,6 +68,9 @@ def load_MNIST_data():
         x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
         input_shape = (img_rows, img_cols, 1)
 
+    if error == True:
+        # add random error to the input training data 
+        x_train = introduce_random_errors(x_train)
 
     # Make the value floats in [0;1] instead of int in [0;255]	
     x_train = x_train.astype('float32')
@@ -85,18 +100,18 @@ def train_main(data, train_1_test_2, is_SC, params):
 
     if is_SC==True:
 
-        model.add(MyConv2D(filters=params[0], kernel=(5, 5), Method = 'Float', Width = 8, Sobol_num1 = 1, 
-                           Sobol_num2 = 4, Stream_Length = 16, input_shape=input_shape))		#used to be Stoch 
+        model.add(MyConv2D(filters=params[0], kernel=(5, 5), Method = 'Stoch', Width = 8, Sobol_num1 = 1, 
+                           Sobol_num2 = 4, Stream_Length = 1024, input_shape=input_shape))		#used to be Stoch 
         model.add(MaxPooling2D(pool_size=(2, 2)))
-        model.add(MyConv2D(filters=params[1], kernel=(5, 5), Method = 'Float', Width = 8, Sobol_num1 = 2, 
-                           Sobol_num2 = 4, Stream_Length = 64))			        #used to be Fixed	
+        model.add(MyConv2D(filters=params[1], kernel=(5, 5), Method = 'Stoch', Width = 8, Sobol_num1 = 2, 
+                           Sobol_num2 = 4, Stream_Length = 1024))			        #used to be Fixed	
         model.add(MaxPooling2D(pool_size=(2, 2)))
         model.add(Flatten())
         model.add(MyDense(filters=params[2], Bias=True, Method = 'Float', WidthIn=8, WidthOut=8, Str_Len=256))                                                #used to be Fixed
         model.add(Activation('relu'))
         model.add(MyDense(filters=params[3], Bias=True, Method = 'Float',  WidthIn=8, WidthOut=8, Str_Len=256))                                                #used to be Fixed
         model.add(Activation('relu'))
-        model.add(MyDense(filters=num_classes, Bias=True, Method = 'Float',  WidthIn=8, WidthOut=8, Str_Len=256))                                                #used to be Fixed
+        model.add(MyDense(filters=num_classes, Bias=True, Method = 'Float',  WidthIn=8, WidthOut=8, Str_Len=1024))                                                #used to be Fixed
         model.add(Activation('softmax'))
 
 
@@ -222,20 +237,24 @@ def attack_main(input_shape, test_data, test_labels, batch_size=9, max_iteration
 
 
 #load data once
-data_set = load_MNIST_data()
+data_set = load_MNIST_data(error=True)
 print("done 1 : data loaded -----------------------")
 
-# #first train the stochastic model
-# train_main(data_set, train_1_test_2=1, is_SC=True, params=params)
-# print("done 2 : SC trained -----------------------")
+#first train the stochastic model
+train_main(data_set, train_1_test_2=1, is_SC=True, params=params)
+print("done 2 : SC trained -----------------------")
 
-# #now train the binary Lenet model
+#now train the binary Lenet model
 # train_main(data_set, train_1_test_2=1, is_SC=False, params=params)
 # print("done 3 : nn trained -----------------------")
 
-
+#test the stochastic model
 train_main(data_set, train_1_test_2=2, is_SC=True, params=params)
-train_main(data_set, train_1_test_2=2, is_SC=False, params=params)
+
+#test binary model now
+#train_main(data_set, train_1_test_2=2, is_SC=False, params=params)
+
+
 # #apply attack
 # _, _, test_data, test_labels, shape_= data_set
 # attack_main(shape_, test_data, test_labels, is_SC=False)
