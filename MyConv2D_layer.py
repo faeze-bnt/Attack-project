@@ -2,6 +2,7 @@
 import numpy as np
 #np.random.seed(1)
 from tensorflow import keras
+from tensorflow import nn as N
 from keras.models import Sequential
 from keras import layers
 from keras import backend as K
@@ -10,6 +11,7 @@ import tensorflow as tf
 from Stochastic   import Stochastic_SNG_A, Stochastic_SNG_B, Quantizer
 from keras import regularizers
 from tensorflow.python.framework import tensor_shape
+
 
 class MyConv2D(layers.Layer):
     '''
@@ -48,7 +50,10 @@ class MyConv2D(layers.Layer):
 		
         super(MyConv2D, self).build(input_shape)
 
+    # @tf.function
     def call(self, x):
+        # with tf.init_scope():
+        # tf.config.run_functions_eagerly(True)
         #------------------------------------------------------ Configuration parameters
         #Method = 2            # 1: Float, 2: Binary-Fixed, 3: Stochastic
         #Width  = 8         	   # precision
@@ -62,28 +67,55 @@ class MyConv2D(layers.Layer):
         
         #-------------------------------------------------------------------------------
         if self.Method == 'Float':     # Method 1 - convolution: using original keras bulit-in function
-            output = K.conv2d(x, self.kernels, padding='valid')       # Do covolution using keras bulit-in function with floating-point inputs
+            output = N.conv2d(x, self.kernels, strides=1, padding='VALID')       # Do covolution using keras bulit-in function with floating-point inputs
+            # output = K.conv2d(x, self.kernels, padding='valid')       # Do covolution using keras bulit-in function with floating-point inputs
         elif self.Method == 'Fixed':                                             
             x = Quantizer(x, self.Width) 							      # Quantize Input
             kernels = Quantizer(self.kernels, self.Width)
             #self.kernels = Quantizer(self.kernels, self.Width)  	      # Quantize Kernels
-            output1 = K.conv2d(x, kernels, padding='valid')     	  # Do covolution using keras bulit-in function with Quantizer inputs
+            output1 = N.conv2d(x, kernels, strides=1, padding='VALID')
+            # output1 = K.conv2d(x, kernels, padding='VALID')     	  # Do covolution using keras bulit-in function with Quantizer inputs
             output = Quantizer(output1, self.Width)
             #output = output1
         elif self.Method == 'Stoch':
             x = Quantizer(x, self.Width)
             kernels = Quantizer(self.kernels, self.Width)        
-        	#-------------- Stochastic bit-stream generators		
+            #-------------- Stochastic bit-stream generators		
             A_stream = Stochastic_SNG_A(x, self.Stream_Length, self.Sobol_num1, 0)
             B_stream = Stochastic_SNG_B(kernels, self.Stream_Length, self.Sobol_num2)
             #-------------- Stochastic convolution
-            output1 = K.conv2d(A_stream, B_stream, padding='valid')
+            output1 = K.conv2d(A_stream, B_stream, padding='VALID')
             #-------------------------------------------------------------------------------
             output = Quantizer(output1/self.Stream_Length, self.Width)
         output = K.relu(output + self.bias)
+        # tf.config.run_functions_eagerly(False)
         return output
         #return Quantizer(output, self.Width);
 
     def compute_output_shape(self, input_shape):
         return (None, self.out_h, self.out_w, self.filters)
+    
+    # @tf.function
+    # def predict(self, x):
+    #     if self.Method == 'Float':     # Method 1 - convolution: using original keras bulit-in function
+    #         output = K.conv2d(x, self.kernels, padding='valid')       # Do covolution using keras bulit-in function with floating-point inputs
+    #     elif self.Method == 'Fixed':                                             
+    #         x = Quantizer(x, self.Width) 							      # Quantize Input
+    #         kernels = Quantizer(self.kernels, self.Width)
+    #         #self.kernels = Quantizer(self.kernels, self.Width)  	      # Quantize Kernels
+    #         output1 = K.conv2d(x, kernels, padding='valid')     	  # Do covolution using keras bulit-in function with Quantizer inputs
+    #         output = Quantizer(output1, self.Width)
+    #         #output = output1
+    #     elif self.Method == 'Stoch':
+    #         x = Quantizer(x, self.Width)
+    #         kernels = Quantizer(self.kernels, self.Width)        
+    #     	#-------------- Stochastic bit-stream generators		
+    #         A_stream = Stochastic_SNG_A(x, self.Stream_Length, self.Sobol_num1, 0)
+    #         B_stream = Stochastic_SNG_B(kernels, self.Stream_Length, self.Sobol_num2)
+    #         #-------------- Stochastic convolution
+    #         output1 = K.conv2d(A_stream, B_stream, padding='valid')
+    #         #-------------------------------------------------------------------------------
+    #         output = Quantizer(output1/self.Stream_Length, self.Width)
+    #     output = K.relu(output + self.bias)
+    #     return output
         

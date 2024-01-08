@@ -8,6 +8,7 @@
 import sys
 import tensorflow as tf
 import numpy as np
+from tensorflow.keras.models import Sequential
 
 BINARY_SEARCH_STEPS = 9  # number of times to adjust the constant with binary search
 MAX_ITERATIONS = 10000   # number of iterations to perform gradient descent
@@ -17,8 +18,12 @@ TARGETED = True          # should we target one specific class? or just be wrong
 CONFIDENCE = 0           # how strong the adversarial example should be
 INITIAL_CONST = 1e-3     # the initial constant c to pick as a first guess
 
+
+# tf.config.run_functions_eagerly(True)
+
 class CarliniL2:
-    def __init__(self, sess, model, batch_size=1, confidence = CONFIDENCE,
+    def __init__(self, sess, model:Sequential,
+                 batch_size=1, confidence = CONFIDENCE,
                  targeted = TARGETED, learning_rate = LEARNING_RATE,
                  binary_search_steps = BINARY_SEARCH_STEPS, max_iterations = MAX_ITERATIONS,
                  abort_early = ABORT_EARLY, 
@@ -50,8 +55,14 @@ class CarliniL2:
         boxmin: Minimum pixel value (default -0.5).
         boxmax: Maximum pixel value (default 0.5).
         """
+        # print(tf.executing_eagerly() , "***************************************888888888")
 
-        image_size, num_channels, num_labels = model.image_size, model.num_channels, model.num_labels
+        # tf.config.run_functions_eagerly(True)
+
+        # image_size, num_channels, num_labels = model.image_size, model.num_channels, model.num_labels
+        image_size = 28
+        num_channels = 1
+        num_labels = 10
         self.sess = sess
         self.TARGETED = targeted
         self.LEARNING_RATE = learning_rate
@@ -67,6 +78,7 @@ class CarliniL2:
         self.I_KNOW_WHAT_I_AM_DOING_AND_WANT_TO_OVERRIDE_THE_PRESOFTMAX_CHECK = False
 
         shape = (batch_size,image_size,image_size,num_channels)
+
         
         # the variable we're going to optimize over
         modifier = tf.Variable(np.zeros(shape,dtype=np.float32))
@@ -90,8 +102,12 @@ class CarliniL2:
         print((self.newimg.shape))
         print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
         
+        self.sess.run(tf.compat.v1.global_variables_initializer())
+
         # prediction BEFORE-SOFTMAX of the model
-        self.output = model.predict(self.newimg)
+        self.output = tf.convert_to_tensor(model.predict(self.newimg, steps=1), dtype=tf.float32) 
+        # self.output = model(self.newimg)
+
         
         # distance to the input data
         self.l2dist = tf.reduce_sum(tf.square(self.newimg-(tf.tanh(self.timg) * self.boxmul + self.boxplus)),[1,2,3])
@@ -207,7 +223,8 @@ class CarliniL2:
                 
                 # print out the losses every 10%
                 if iteration%(self.MAX_ITERATIONS//10) == 0:
-                    print(iteration,self.sess.run((self.loss,self.loss1,self.loss2)))
+                    # print(iteration,self.sess.run((self.loss,self.loss1,self.loss2)))
+                    iteration,self.sess.run((self.loss,self.loss1,self.loss2))
 
                 # check if we should abort search if we're getting nowhere.
                 if self.ABORT_EARLY and iteration%(self.MAX_ITERATIONS//10) == 0:
