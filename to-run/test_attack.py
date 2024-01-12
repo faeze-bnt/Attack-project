@@ -46,16 +46,18 @@ def generate_data(data, samples, targeted=True, start=0, inception=False):
             if inception:
                 seq = random.sample(range(1,1001), 10)
             else:
-                seq = range(data[3].shape[1])
+                seq = range(data.y_test.shape[1])
+            print(seq)
+            print("19191919119191919191919191919919191919191919191")
 
             for j in seq:
-                if (j == np.argmax(data[3][start+i])) and (inception == False):
+                if (j == np.argmax(data.y_test[start+i])) and (inception == False):
                     continue
-                inputs.append(data[2][start+i])
-                targets.append(np.eye(data[3].shape[1])[j])
+                inputs.append(data.x_test[start+i])
+                targets.append(np.eye(data.y_test.shape[1])[j])
         else:
-            inputs.append(data[2][start+i])
-            targets.append(data[3][start+i])
+            inputs.append(data.x_test[start+i])
+            targets.append(data.y_test[start+i])
 
     inputs = np.array(inputs)
     targets = np.array(targets)
