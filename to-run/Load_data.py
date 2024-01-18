@@ -7,12 +7,13 @@
 
 import tensorflow as tf
 import numpy as np
+import pickle
 
 from keras.datasets import mnist
 from keras import backend as K
 
 
-class load_MNIST:
+class Load_DATA:
     def __init__(self, error=False, train_samples=60000, test_samples=10000, validation_samples=5000, 
                  img_rows=28, img_cols=28, num_classes=10):
         # the data, split between train and test sets
@@ -33,7 +34,7 @@ class load_MNIST:
 
         # add random error to the input training data 
         if error == True:
-            x_train = introduce_random_errors(x_train)
+            x_train = self.introduce_random_errors(x_train)
 
         # Make the value floats in [0;1] instead of int in [0;255]	
         x_train = x_train.astype('float32')
@@ -64,14 +65,33 @@ class load_MNIST:
         self.input_shape = input_shape
 
 
+    def data_after_attack(self, x_attacked, y_attacked):
+        self.x_test = x_attacked
+        self.y_test = y_attacked
 
 
-def introduce_random_errors(images, error_rate=0.05):    
-    noisy_images = images.copy()
-    for img in noisy_images:        # Number of pixels to alter
-        num_errors = int(error_rate * img.size)        
-        for _ in range(num_errors):
-            # Randomly choose a pixel and change its value            
-            x, y = np.random.randint(0, img.shape[0]), np.random.randint(0, img.shape[1])
-            img[x, y] = np.random.randint(0, 256)    
-    return noisy_images
+    def save_after_attack(self, x_attacked, y_attacked):
+        with open('adv_attack_x.pkl', 'wb') as file:
+            pickle.dump(x_attacked, file)
+        with open('adv_attack_y.pkl', 'wb') as file:
+            pickle.dump(y_attacked, file)
+
+
+    def load_after_attack(self):
+        with open('adv_attack_x.pkl', 'rb') as file:
+            x_attacked = pickle.load(file)
+        with open('adv_attack_y.pkl', 'rb') as file:
+            y_attacked = pickle.load(file)
+
+        self.data_after_attack(x_attacked, y_attacked)
+
+
+    def introduce_random_errors(images, error_rate=0.05):    
+        noisy_images = images.copy()
+        for img in noisy_images:        # Number of pixels to alter
+            num_errors = int(error_rate * img.size)        
+            for _ in range(num_errors):
+                # Randomly choose a pixel and change its value            
+                x, y = np.random.randint(0, img.shape[0]), np.random.randint(0, img.shape[1])
+                img[x, y] = np.random.randint(0, 256)    
+        return noisy_images

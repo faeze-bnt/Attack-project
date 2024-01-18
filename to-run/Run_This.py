@@ -5,7 +5,7 @@ import numpy as np
 #import h5py
 
 from keras.models import Sequential
-from tensorflow.keras.optimizers import Adam
+# from tensorflow.keras.optimizers import Adam
 from keras.layers import Dense, Dropout, Flatten, Lambda, Conv2D, MaxPooling2D, Activation, GaussianNoise, BatchNormalization
 from keras import backend as K
 from MyConv2D_layer import MyConv2D
@@ -16,7 +16,7 @@ from l2_attack import CarliniL2
 #from li_attack import CarliniLi
 
 from setup_fake_mnist import FakeModel
-from Load_data import load_MNIST
+from Load_data import Load_DATA
 
 from test_attack import generate_data, show
 import time
@@ -28,9 +28,9 @@ import time
 batch_size = 64
 num_classes = 10
 epochs = 50
-train_samples=100#60000
-test_samples=10 #10000
-validation_samples = 5 #5000
+train_samples= 60000
+test_samples= 9999 #10000
+validation_samples = 5000
 params = [20, 20, 800, 10, 10]
 
 filename_best_sc = 'my_LeNet5_best_SC'
@@ -46,8 +46,6 @@ img_rows, img_cols = 28, 28
 
 
 def train_main(data, train_1_test_2, is_SC, params):
-
-    # x_train, y_train, x_test, y_test, input_shape = data
 
     model = Sequential()
     filepath = filename_best + filename_h5
@@ -66,7 +64,7 @@ def train_main(data, train_1_test_2, is_SC, params):
         model.add(MyDense(filters=params[3], Bias=True, Method = 'Float',  WidthIn=8, WidthOut=8, Str_Len=256))                                                #used to be Fixed
         model.add(Activation('relu'))
         model.add(MyDense(filters=num_classes, Bias=True, Method = 'Float',  WidthIn=8, WidthOut=8, Str_Len=1024))                                                #used to be Fixed
-        # model.add(Activation('softmax'))
+        model.add(Activation('softmax'))
 
 
         #----Saving the best training weights 'my_LeNet5_best_SC.h5'
@@ -88,7 +86,7 @@ def train_main(data, train_1_test_2, is_SC, params):
         model.add(MyDense(filters=params[3], Bias=True, Method = 'Float',  WidthIn=8, WidthOut=8, Str_Len=256))                           
         model.add(Activation('relu'))
         model.add(MyDense(filters=num_classes, Bias=True, Method = 'Float',  WidthIn=8, WidthOut=8, Str_Len=1024))                           
-        # model.add(Activation('softmax'))
+        model.add(Activation('softmax'))
 
 
     model.compile(loss=losses.CategoricalCrossentropy(), optimizer='adam' ,#tf.keras.optimizers.Adam(), 
@@ -125,51 +123,38 @@ def train_main(data, train_1_test_2, is_SC, params):
 
 def attack_main():
     with tf.compat.v1.Session() as sess:
-        # data_set = load_MNIST(train_samples=train_samples, test_samples=test_samples, 
-        #               validation_samples=validation_samples, img_rows=img_rows, img_cols=img_cols, 
-        #               num_classes=num_classes)
-        # data_set = load_MNIST_data()
+        
         model_name = filename_best + filename_h5 
         
         # model defenition moved to class: FakeModel
         model_fake = FakeModel(model_name, num_classes, params, sess)
         attack = CarliniL2(sess, model_fake, batch_size=9, max_iterations=1000, confidence=0)
-        inputs, targets = generate_data(data_set, samples=1, targeted=True, 
+        inputs, targets = generate_data(data_set, samples=int(test_samples/9), targeted=False, #True, 
                                         start=0, inception=False)
-        print(data_set.y_test.shape)
-        print(data_set.y_test.shape[1])
-        print(inputs.shape  )
-        print(targets)
-        print("222222222222222222222222222222222222222222222222222222222222")
+        
         timestart = time.time()
         adv = attack.attack(inputs, targets)
-        # adv = attack.attack(data_set.x_test, data_set.y_test)
         timeend = time.time()
         
         print("Took",timeend-timestart,"seconds to run ",len(inputs),"samples.")
 
-        print(adv.shape)
-        for i in range(len(adv)):
-            print("Valid:")
-            show(inputs[i])
-            # print("Data Set:")
-            # show(data_set.x_test[i])
-            print("Adversarial:")
-            show(adv[i])
+        print(len(adv))
+        for i in range(5):
+            # print("Valid:")
+            # show(inputs[i])
+            # print("Adversarial:")
+            # show(adv[i])
             
             print("Classification:", model_fake.model.predict(adv[i:i+1]))
-
             print("Total distortion:", np.sum((adv[i]-inputs[i])**2)**.5)
-            # sess.close()
 
-    return adv
+    return adv, targets
 
 
 #load data once
-data_set = load_MNIST(train_samples=train_samples, test_samples=test_samples, 
+data_set = Load_DATA(train_samples=train_samples, test_samples=test_samples, 
                       validation_samples=validation_samples, img_rows=img_rows, img_cols=img_cols, 
                       num_classes=num_classes)
-# data_set = load_MNIST_data()
 print("done 1 : data loaded -----------------------")
 
 #now train the binary Lenet model
@@ -181,14 +166,19 @@ print("done 3 : nn trained -----------------------")
 # print("done 4 : SC tested -----------------------")
 
 #test binary model now
-# train_main(data_set, train_1_test_2=2, is_SC=False, params=params)
-# print("done 5 : nn tested -----------------------")
+train_main(data_set, train_1_test_2=2, is_SC=False, params=params)
+print("done 5 : nn tested -----------------------")
 
 
-#apply attack
-adv_test_data = attack_main()
+#apply attack and save the out in files
+adv_test_data, adv_test_labels = attack_main()
 print("done 6 : attack applied -----------------------")
 
+data_set.save_after_attack(adv_test_data, adv_test_labels)
+print("done 9 : attack saved in file -----------------------")
+
+data_set.load_after_attack()
+print("done 10 : attacked data loaded from file -----------------------")
 
 # #test SC network, after attack being applied
 # train_main((data_set[0], data_set[1], adv_test_data, data_set[3], data_set[4]), 
@@ -197,6 +187,5 @@ print("done 6 : attack applied -----------------------")
 
 
 #test binary network, after attack being applied
-# train_main((data_set[0], data_set[1], adv_test_data, adv_test_labels, shape_), 
-#            train_1_test_2=2, is_SC=False, params=params)
-# print("done 8 : SC tested after attack -----------------------")
+train_main(data_set, train_1_test_2=2, is_SC=False, params=params)
+print("done 8 : SC tested after attack -----------------------")

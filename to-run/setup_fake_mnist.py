@@ -21,21 +21,21 @@ import gzip
 
 
 
-def extract_data(filename, num_images):
-    with gzip.open(filename) as bytestream:
-        bytestream.read(16)
-        buf = bytestream.read(num_images*28*28)
-        data = np.frombuffer(buf, dtype=np.uint8).astype(np.float32)
-        data = (data / 255) - 0.5
-        data = data.reshape(num_images, 28, 28, 1)
-        return data
+# def extract_data(filename, num_images):
+#     with gzip.open(filename) as bytestream:
+#         bytestream.read(16)
+#         buf = bytestream.read(num_images*28*28)
+#         data = np.frombuffer(buf, dtype=np.uint8).astype(np.float32)
+#         data = (data / 255) - 0.5
+#         data = data.reshape(num_images, 28, 28, 1)
+#         return data
 
-def extract_labels(filename, num_images):
-    with gzip.open(filename) as bytestream:
-        bytestream.read(8)
-        buf = bytestream.read(1 * num_images)
-        labels = np.frombuffer(buf, dtype=np.uint8)
-    return (np.arange(10) == labels[:, None]).astype(np.float32)
+# def extract_labels(filename, num_images):
+#     with gzip.open(filename) as bytestream:
+#         bytestream.read(8)
+#         buf = bytestream.read(1 * num_images)
+#         labels = np.frombuffer(buf, dtype=np.uint8)
+#     return (np.arange(10) == labels[:, None]).astype(np.float32)
 
 
 class FakeModel:
