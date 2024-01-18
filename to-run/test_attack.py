@@ -41,7 +41,7 @@ def generate_data(data, samples, targeted=True, start=0, inception=False):
     """
     inputs = []
     targets = []
-    for i in range(samples):
+    for i in range(samples*9):
         if targeted:
             if inception:
                 seq = random.sample(range(1,1001), 10)
@@ -64,43 +64,3 @@ def generate_data(data, samples, targeted=True, start=0, inception=False):
 
     return inputs, targets
 
-
-# if __name__ == "__main__":
-
-
-#     with tf.compat.v1.Session() as sess:
-
-#         data, model =  MNIST(), MNISTModel("my_LeNet5_best.h5", sess)
-
-#         attack = CarliniL2(sess, model, batch_size=9, max_iterations=1000, confidence=0)
-
-#         # print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
-#         # print(np.size(data))
-#         # print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
-
-#         inputs, targets = generate_data(data, samples=1, targeted=True,
-#                                         start=0, inception=False)
-#         timestart = time.time()
-#         # print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
-#         # print((inputs.shape))
-#         # print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
-        
-#         adv = attack.attack(inputs, targets)
-#         timeend = time.time()
-        
-#         print("Took",timeend-timestart,"seconds to run",len(inputs),"samples.")
-
-#         print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
-#         print(len(adv))
-#         print(inputs)
-#         print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
-
-#         for i in range(len(adv)):
-#             print("Valid:")
-#             #show(inputs[i])
-#             print("Adversarial:")
-#             #show(adv[i])
-            
-#             print("Classification:", model.model.predict(adv[i:i+1]))
-
-#             print("Total distortion:", np.sum((adv[i]-inputs[i])**2)**.5)
