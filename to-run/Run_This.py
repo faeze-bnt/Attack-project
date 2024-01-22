@@ -52,7 +52,7 @@ def train_main(data, train_1_test_2, is_SC, params):
 
     if is_SC==True:
 
-        model.add(MyConv2D(filters=params[0], kernel=(5, 5), Method = 'Fixed', Width = 8, Sobol_num1 = 1, 
+        model.add(MyConv2D(filters=params[0], kernel=(5, 5), Method = 'Stoch', Width = 8, Sobol_num1 = 1, 
                            Sobol_num2 = 4, Stream_Length = 16, input_shape=data.input_shape))		#used to be Stoch 
         model.add(MaxPooling2D(pool_size=(2, 2)))
         model.add(MyConv2D(filters=params[1], kernel=(5, 5), Method = 'Float', Width = 8, Sobol_num1 = 2, 
@@ -157,35 +157,34 @@ data_set = Load_DATA(train_samples=train_samples, test_samples=test_samples,
                       num_classes=num_classes)
 print("done 1 : data loaded -----------------------")
 
-#now train the binary Lenet model
-train_main(data_set, train_1_test_2=1, is_SC=False, params=params)
-print("done 3 : nn trained -----------------------")
+# #now train the binary Lenet model
+# train_main(data_set, train_1_test_2=1, is_SC=False, params=params)
+# print("done 3 : nn trained -----------------------")
 
-# #test the stochastic model
-# train_main(data_set, train_1_test_2=2, is_SC=True, params=params)
-# print("done 4 : SC tested -----------------------")
+#test the stochastic model
+train_main(data_set, train_1_test_2=2, is_SC=True, params=params)
+print("done 4 : SC tested -----------------------")
 
-#test binary model now
-train_main(data_set, train_1_test_2=2, is_SC=False, params=params)
-print("done 5 : nn tested -----------------------")
+# #test binary model now
+# train_main(data_set, train_1_test_2=2, is_SC=False, params=params)
+# print("done 5 : nn tested -----------------------")
 
 
-#apply attack and save the out in files
-adv_test_data, adv_test_labels = attack_main()
-print("done 6 : attack applied -----------------------")
+# #apply attack and save the out in files
+# adv_test_data, adv_test_labels = attack_main()
+# print("done 6 : attack applied -----------------------")
 
-data_set.save_after_attack(adv_test_data, adv_test_labels)
-print("done 9 : attack saved in file -----------------------")
+# data_set.save_after_attack(adv_test_data, adv_test_labels)
+# print("done 9 : attack saved in file -----------------------")
 
-data_set.load_after_attack()
-print("done 10 : attacked data loaded from file -----------------------")
+# data_set.load_after_attack()
+# print("done 10 : attacked data loaded from file -----------------------")
 
 # #test SC network, after attack being applied
-# train_main((data_set[0], data_set[1], adv_test_data, data_set[3], data_set[4]), 
-#            train_1_test_2=2, is_SC=True, params=params)
+# train_main(data_set, train_1_test_2=2, is_SC=True, params=params)
 # print("done 7 : SC tested after attack -----------------------")
 
 
-#test binary network, after attack being applied
-train_main(data_set, train_1_test_2=2, is_SC=False, params=params)
-print("done 8 : SC tested after attack -----------------------")
+# #test binary network, after attack being applied
+# train_main(data_set, train_1_test_2=2, is_SC=False, params=params)
+# print("done 8 : nn tested after attack -----------------------")
