@@ -56,6 +56,7 @@ def train_main(data, train_1_test_2, is_SC, params):
                            Sobol_num2 = 4, Stream_Length = 16, input_shape=data.input_shape))		#used to be Stoch 
         model.add(MaxPooling2D(pool_size=(2, 2)))
         model.add(MyConv2D(filters=params[1], kernel=(5, 5), Method = 'Float', Width = 8, Sobol_num1 = 2, 
+
                            Sobol_num2 = 4, Stream_Length = 64))			        #used to be Fixed	
         model.add(MaxPooling2D(pool_size=(2, 2)))
         model.add(Flatten())
@@ -119,6 +120,7 @@ def train_main(data, train_1_test_2, is_SC, params):
         else:
           plt_name = "C_matrix_binary.jpg"
         Conf_matrix(data.y_test, test_pred, plt_name)
+
 
 
 

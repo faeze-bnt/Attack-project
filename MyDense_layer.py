@@ -12,7 +12,9 @@ import tensorflow as tf
 #===================================================================================
 class MyDense(layers.Layer):
 
-  def __init__(self, filters, Bias = False, Weight_initializer = 'RandomNormal', Bias_initializer = 'RandomNormal', W_regularizer = None, B_regularizer = None, Method = 2, WidthIn = 8, WidthOut = 8, SNG_num = [1,2], Str_Len = 8, **kwargs):
+  def __init__(self, filters, Bias = False, Weight_initializer = 'RandomNormal', 
+                Bias_initializer = 'RandomNormal', W_regularizer = None, B_regularizer = None, 
+                Method = 2, WidthIn = 8, WidthOut = 8, SNG_num = [1,2], Str_Len = 8, **kwargs):
     self.output_dim = filters
     self.Bias = Bias
     self.Weight_initializer = Weight_initializer
@@ -50,11 +52,12 @@ class MyDense(layers.Layer):
 	#Method = 1: Float, 2: Binary-Fixed, 3: Stochastic
 	#-------------------------------------------------------------------------------
     if self.Method == 'Float':     # Method 1 - convolution: using original keras bulit-in function
-        output = y = tf.matmul(x, self.kernel)    # Do multiplication using keras bulit-in function with floating-point inputs and output
+        # output = tf.experimental.numpy.matmul(x, self.kernel)
+        output = tf.matmul(x, self.kernel)    # Do multiplication using keras bulit-in function with floating-point inputs and output
     elif self.Method == 'Fixed':                                             
         x = Quantizer(x, self.WidthIn)                         							                # Quantize Input
         kernel = Quantizer(self.kernel, self.WidthIn, type='round')   	                    # Quantize Kernel 
-        output = y = tf.matmul(x, kernel)                                                   # Do multiplication using keras bulit-in function with Quantizer inputs and output
+        output = tf.matmul(x, kernel)                                                   # Do multiplication using keras bulit-in function with Quantizer inputs and output
         output = Quantizer(output, self.WidthOut, clip = False)
     elif self.Method == 'Stoch':                                             
         x = Quantizer(x, self.WidthIn) 							                                        # Quantize Input
@@ -74,6 +77,7 @@ class MyDense(layers.Layer):
             return Quantizer(output + self.bias, self.WidthOut, 'floor', clip = False)
     else:
         return output
+    
 
   def compute_output_shape(self, input_shape):
     return (None, self.out_h, self.out_w, self.filters)

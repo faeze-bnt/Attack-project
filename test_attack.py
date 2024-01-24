@@ -29,7 +29,7 @@ def show(img):
         print("".join([remap[int(round(x))] for x in img[i*28:i*28+28]]))
 
 
-def generate_data(data, samples, targeted=True, start=0, inception=False):
+def generate_data(test_data, test_labels, samples, targeted=True, start=0, inception=False):
     """
     Generate the input data to the attack algorithm.
 
@@ -46,19 +46,21 @@ def generate_data(data, samples, targeted=True, start=0, inception=False):
             if inception:
                 seq = random.sample(range(1,1001), 10)
             else:
-                seq = range(data.test_labels.shape[1])
+                seq = range(test_labels.shape[1])
 
             for j in seq:
-                if (j == np.argmax(data.test_labels[start+i])) and (inception == False):
+                if (j == np.argmax(test_labels[start+i])) and (inception == False):
                     continue
-                inputs.append(data.test_data[start+i])
-                targets.append(np.eye(data.test_labels.shape[1])[j])
+                inputs.append(test_data[start+i])
+                targets.append(np.eye(test_labels.shape[1])[j])
+
+            
         else:
-            inputs.append(data.test_data[start+i])
-            targets.append(data.test_labels[start+i])
-        # print(seq)
+            inputs.append(test_data[start+i])
+            targets.append(test_labels[start+i])
+        print(seq)
         print(start+i)
-        print(data.test_labels[start+i])
+        print(test_labels[start+i])
         print(len(inputs))
 
     inputs = np.array(inputs)
@@ -67,42 +69,42 @@ def generate_data(data, samples, targeted=True, start=0, inception=False):
     return inputs, targets
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
 
-    with tf.compat.v1.Session() as sess:
+#     with tf.compat.v1.Session() as sess:
 
-        data, model =  MNIST(), MNISTModel("my_LeNet5_best.h5", sess)
+#         data, model =  MNIST(), MNISTModel("my_LeNet5_best.h5", sess)
 
-        attack = CarliniL2(sess, model, batch_size=9, max_iterations=1000, confidence=0)
+#         attack = CarliniL2(sess, model, batch_size=9, max_iterations=1000, confidence=0)
 
-        # print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
-        # print(np.size(data))
-        # print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+#         # print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+#         # print(np.size(data))
+#         # print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
 
-        inputs, targets = generate_data(data, samples=1, targeted=True,
-                                        start=0, inception=False)
-        timestart = time.time()
-        # print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
-        # print((inputs.shape))
-        # print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+#         inputs, targets = generate_data(data, samples=1, targeted=True,
+#                                         start=0, inception=False)
+#         timestart = time.time()
+#         # print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+#         # print((inputs.shape))
+#         # print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
         
-        adv = attack.attack(inputs, targets)
-        timeend = time.time()
+#         adv = attack.attack(inputs, targets)
+#         timeend = time.time()
         
-        print("Took",timeend-timestart,"seconds to run",len(inputs),"samples.")
+#         print("Took",timeend-timestart,"seconds to run",len(inputs),"samples.")
 
-        print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
-        print(len(adv))
-        print(inputs)
-        print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+#         print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+#         print(len(adv))
+#         print(inputs)
+#         print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
 
-        for i in range(len(adv)):
-            print("Valid:")
-            #show(inputs[i])
-            print("Adversarial:")
-            #show(adv[i])
+#         for i in range(len(adv)):
+#             print("Valid:")
+#             #show(inputs[i])
+#             print("Adversarial:")
+#             #show(adv[i])
             
-            print("Classification:", model.model.predict(adv[i:i+1]))
+#             print("Classification:", model.model.predict(adv[i:i+1]))
 
-            print("Total distortion:", np.sum((adv[i]-inputs[i])**2)**.5)
+#             print("Total distortion:", np.sum((adv[i]-inputs[i])**2)**.5)

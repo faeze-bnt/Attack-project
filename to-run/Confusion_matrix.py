@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns; sns.set()  # For pretty confusion matrix
 
+
 def one_hot_to_binary(one_hot_array):
   binary_data = []
   for i in range(one_hot_array.shape[0]):
@@ -25,6 +26,7 @@ class Conf_matrix:
     # drae a plot to visually see the results.
     fig, ax = plt.subplots()
     sns.heatmap(c_matrix, annot=False, ax=ax, cmap='Blues')  # Annotate the cells with the numeric values
+
 
     ax.set_xlabel('Predicted labels')
     ax.set_ylabel('True labels')

@@ -1,9 +1,8 @@
 # Attack-project
 
-for the latest version of code, run Run_This.
--------
+for the latest version of the code, go to the to-run directory. from there, run Run_This.py
 
-There are 2 sub-project here:
+There are 2 sub-projects here:
 
 group 1:
   l0_attack

@@ -5,6 +5,7 @@ import numpy as np
 #import h5py
 from keras.datasets import mnist
 from keras.models import Sequential
+from tensorflow.keras.optimizers import Adam
 from keras.layers import Dense, Dropout, Flatten, Lambda, Conv2D, MaxPooling2D, Activation, GaussianNoise, BatchNormalization
 from keras import backend as K
 from MyConv2D_layer import MyConv2D
@@ -14,13 +15,17 @@ from l2_attack import CarliniL2
 #from l0_attack import CarliniL0
 #from li_attack import CarliniLi
 
-import test_attack
+from test_attack import generate_data, show
 import time
+
+# tf.compat.v1.disable_eager_execution()
+# tf.config.run_functions_eagerly(True)
+
 
 batch_size = 64
 num_classes = 10
 epochs = 50
-train_samples=100 #60000
+train_samples=60000
 test_samples=10000
 params = [20, 20, 800, 10, 10]
 
@@ -32,11 +37,24 @@ filename_keras = '.keras'
 #train_1_test_2 = 1
 
 
+tf.compat.v1.disable_eager_execution()
 
 # input image dimensions
 img_rows, img_cols = 28, 28
 
-def load_MNIST_data():
+
+def introduce_random_errors(images, error_rate=0.05):    
+    noisy_images = images.copy()
+    for img in noisy_images:        # Number of pixels to alter
+        num_errors = int(error_rate * img.size)        
+        for _ in range(num_errors):
+            # Randomly choose a pixel and change its value            
+            x, y = np.random.randint(0, img.shape[0]), np.random.randint(0, img.shape[1])
+            img[x, y] = np.random.randint(0, 256)    
+    return noisy_images
+        
+
+def load_MNIST_data(error=False):
     
     # the data, split between train and test sets
     (x_train, y_train), (x_test, y_test) = mnist.load_data()
@@ -56,6 +74,9 @@ def load_MNIST_data():
         x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
         input_shape = (img_rows, img_cols, 1)
 
+    if error == True:
+        # add random error to the input training data 
+        x_train = introduce_random_errors(x_train)
 
     # Make the value floats in [0;1] instead of int in [0;255]	
     x_train = x_train.astype('float32')
@@ -82,46 +103,64 @@ def train_main(data, train_1_test_2, is_SC, params):
     x_train, y_train, x_test, y_test, input_shape = data
 
     model = Sequential()
+    filepath = filename_best + filename_h5
 
     if is_SC==True:
 
-        model.add(MyConv2D(filters=params[0], kernel=(5, 5), Method = 'Float', Width = 8, Sobol_num1 = 1, 
+        model.add(MyConv2D(filters=params[0], kernel=(5, 5), Method = 'Fixed', Width = 8, Sobol_num1 = 1, 
                            Sobol_num2 = 4, Stream_Length = 16, input_shape=input_shape))		#used to be Stoch 
         model.add(MaxPooling2D(pool_size=(2, 2)))
         model.add(MyConv2D(filters=params[1], kernel=(5, 5), Method = 'Float', Width = 8, Sobol_num1 = 2, 
-                           Sobol_num2 = 4, Stream_Length = 64))			        #used to be Fixed	
+                           Sobol_num2 = 4, Stream_Length = 1024))			        #used to be Fixed	
         model.add(MaxPooling2D(pool_size=(2, 2)))
         model.add(Flatten())
-        model.add(MyDense(filters=params[2], Bias=True, Method = 'Float', WidthIn=8, WidthOut=8, Str_Len=256))                                                #used to be Fixed
+        model.add(MyDense(filters=params[2], Bias=True, Method = 'Float', WidthIn=8, WidthOut=8, Str_Len=16))                                                #used to be Fixed
         model.add(Activation('relu'))
         model.add(MyDense(filters=params[3], Bias=True, Method = 'Float',  WidthIn=8, WidthOut=8, Str_Len=256))                                                #used to be Fixed
         model.add(Activation('relu'))
-        model.add(MyDense(filters=num_classes, Bias=True, Method = 'Float',  WidthIn=8, WidthOut=8, Str_Len=256))                                                #used to be Fixed
-        model.add(Activation('softmax'))
+        model.add(MyDense(filters=num_classes, Bias=True, Method = 'Float',  WidthIn=8, WidthOut=8, Str_Len=1024))                                                #used to be Fixed
+        # model.add(Activation('softmax'))
 
 
         #----Saving the best training weights 'my_LeNet5_best_SC.h5'
-        filepath = filename_best_sc + filename_h5        #Save the best epoch
-        savepath = filename_best_sc + filename_keras
+        # filepath = filename_best_sc + filename_h5        #Save the best epoch
+        # savepath = filename_best_sc + filename_keras
     
     elif is_SC==False:
 
-        model.add(Conv2D(params[0], (5, 5), activation='relu', use_bias=True, bias_initializer='RandomNormal', 
-                         input_shape=input_shape))
+        #-----the NN in binary mode with our new method
+        model.add(MyConv2D(filters=params[0], kernel=(5, 5), Method = 'Float', Width = 8, Sobol_num1 = 1, 
+                           Sobol_num2 = 4, Stream_Length = 1024, input_shape=input_shape))		 
         model.add(MaxPooling2D(pool_size=(2, 2)))
-        model.add(Conv2D(params[1], (5, 5), activation='relu', use_bias=True, bias_initializer='RandomNormal'))
+        model.add(MyConv2D(filters=params[1], kernel=(5, 5), Method = 'Float', Width = 8, Sobol_num1 = 2, 
+                           Sobol_num2 = 4, Stream_Length = 1024))			       	
         model.add(MaxPooling2D(pool_size=(2, 2)))
         model.add(Flatten())
-        model.add(Dense(params[2], input_dim=320, activation='relu', use_bias=True, bias_initializer='RandomNormal'))
-        model.add(Dense(params[3], input_dim=800, activation='relu', use_bias=True, bias_initializer='RandomNormal'))
-        model.add(Dense(num_classes, activation='softmax', use_bias=True, bias_initializer='RandomNormal'))
+        model.add(MyDense(filters=params[2], Bias=True, Method = 'Float', WidthIn=8, WidthOut=8, Str_Len=256))                           
+        model.add(Activation('relu'))
+        model.add(MyDense(filters=params[3], Bias=True, Method = 'Float',  WidthIn=8, WidthOut=8, Str_Len=256))                           
+        model.add(Activation('relu'))
+        model.add(MyDense(filters=num_classes, Bias=True, Method = 'Float',  WidthIn=8, WidthOut=8, Str_Len=1024))                           
+        # model.add(Activation('softmax'))
+
+
+        # #-----the NN in binary mode with conventional method
+        # model.add(Conv2D(params[0], (5, 5), input_shape=input_shape)) # activation='relu', use_bias=True, bias_initializer='RandomNormal', 
+        # model.add(MaxPooling2D(pool_size=(2, 2)))
+        # model.add(Conv2D(params[1], (5, 5)))        # , activation='relu', use_bias=True, bias_initializer='RandomNormal'
+        # model.add(MaxPooling2D(pool_size=(2, 2)))
+        # model.add(Flatten())
+        # model.add(Dense(params[2], input_dim=320, activation='relu', use_bias=True, bias_initializer='RandomNormal'))
+        # model.add(Dense(params[3], input_dim=800, activation='relu', use_bias=True, bias_initializer='RandomNormal'))
+        # model.add(Dense(num_classes, activation='softmax', use_bias=True, bias_initializer='RandomNormal'))
 
         #----Saving the best training weights 'my_LeNet5_best_.h5'
-        filepath = filename_best + filename_h5             #Save the best epoch
-        savepath = filename_best + filename_keras
+        # filepath = filename_best + filename_h5             #Save the best epoch
+        # savepath = filename_best + filename_keras
 
 
-    model.compile(loss=losses.CategoricalCrossentropy(), optimizer=tf.keras.optimizers.Adam(), metrics=['accuracy'])
+    model.compile(loss=losses.CategoricalCrossentropy(), optimizer='adam' ,#tf.keras.optimizers.Adam(), 
+                  metrics=['accuracy'])
 
 
     if train_1_test_2==1: ##--only for train
@@ -156,74 +195,99 @@ def train_main(data, train_1_test_2, is_SC, params):
     #print('Number of Errors:', test_samples - (score[1]*test_samples),'out of ',test_samples)
 
 
-def attack_main(input_shape, test_data, test_labels, batch_size=9, max_iterations=1000, confidence=0, is_SC=True):
-    num_channels = 1
-    image_size = img_rows       #28
-    num_labels = num_classes    #10
+def attack_main(sess, input_shape, test_data, test_labels, batch_size=9, max_iterations=1000, confidence=0):
+    # num_channels = 1
+    # image_size = img_rows       #28
+    # num_labels = num_classes    #10
     
     
-    if is_SC:
-        model_name = filename_best_sc + filename_keras
-    else:
-        model_name = filename_best + filename_h5 # filename_keras
+    # if is_SC:
+    #     model_name = filename_best_sc + filename_keras
+    # else:
+    #     model_name = filename_best + filename_h5 # filename_keras
+
+    model_name = filename_best + filename_h5 #filename_best + filename_keras
+    model_fake = Sequential()
+
+    
+    #-----the NN in binary mode with our method
+    model_fake.add(MyConv2D(filters=params[0], kernel=(5, 5), Method = 'Float', Width = 8, Sobol_num1 = 1, 
+                    Sobol_num2 = 4, Stream_Length = 1024, input_shape=input_shape))		 
+    model_fake.add(MaxPooling2D(pool_size=(2, 2)))
+    model_fake.add(MyConv2D(filters=params[1], kernel=(5, 5), Method = 'Float', Width = 8, Sobol_num1 = 2, 
+                    Sobol_num2 = 4, Stream_Length = 1024))			       	
+    model_fake.add(MaxPooling2D(pool_size=(2, 2)))
+    model_fake.add(Flatten())
+    model_fake.add(MyDense(filters=params[2], Bias=True, Method = 'Float', WidthIn=8, WidthOut=8, Str_Len=256))                           
+    model_fake.add(Activation('relu'))
+    model_fake.add(MyDense(filters=params[3], Bias=True, Method = 'Float',  WidthIn=8, WidthOut=8, Str_Len=256))                           
+    model_fake.add(Activation('relu'))
+    model_fake.add(MyDense(filters=num_classes, Bias=True, Method = 'Float',  WidthIn=8, WidthOut=8, Str_Len=1024))                           
+    # model_fake.add(Activation('softmax'))
+    
+
+    # model.add(Conv2D(params[0], (5, 5), activation='relu', use_bias=True, bias_initializer='RandomNormal', 
+    #                  input_shape=input_shape))
+    # model.add(MaxPooling2D(pool_size=(2, 2)))
+    # model.add(Conv2D(params[1], (5, 5), activation='relu', use_bias=True, bias_initializer='RandomNormal'))
+    # model.add(MaxPooling2D(pool_size=(2, 2)))
+    # model.add(Flatten())
+    # model.add(Dense(params[2], input_dim=320, activation='relu', use_bias=True, bias_initializer='RandomNormal'))
+    # model.add(Dense(params[3], input_dim=800, activation='relu', use_bias=True, bias_initializer='RandomNormal'))
+    # model.add(Dense(num_classes, activation='softmax', use_bias=True, bias_initializer='RandomNormal'))
+
+    # model.compile(loss=losses.CategoricalCrossentropy(), optimizer=tf.keras.optimizers.Adam(), metrics=['accuracy'])
+    model_fake.build(input_shape) #(batch_size, img_rows, img_cols, num_channels))  # Replace with your model's input shape, None is for batch size
+    
+    print("Weigths are NOOOOT loaded from disk") 
+    model_fake.load_weights(model_name)
+    print("Weigths are loaded from disk")
+
+
+    model_fake.summary()
+
 
     # with tf.compat.v1.Session() as sess:
 
-        #loaded_model = tf.keras.saving.load_model(model_name, compile=True)
-    model_name = filename_best + filename_keras
-    model = Sequential()
+    attack = CarliniL2(sess, model_fake)
 
-    model.add(Conv2D(params[0], (5, 5), activation='relu', use_bias=True, bias_initializer='RandomNormal', 
-                     input_shape=input_shape))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Conv2D(params[1], (5, 5), activation='relu', use_bias=True, bias_initializer='RandomNormal'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Flatten())
-    model.add(Dense(params[2], input_dim=320, activation='relu', use_bias=True, bias_initializer='RandomNormal'))
-    model.add(Dense(params[3], input_dim=800, activation='relu', use_bias=True, bias_initializer='RandomNormal'))
-    model.add(Dense(num_classes, activation='softmax', use_bias=True, bias_initializer='RandomNormal'))
 
-    #model.compile(loss=losses.CategoricalCrossentropy(), optimizer=tf.keras.optimizers.Adam(), metrics=['accuracy'])
-    model.build((batch_size, img_rows, img_cols, num_channels))  # Replace with your model's input shape, None is for batch size
+    # attack = CarliniL2(sess, model_fake, image_size, num_channels, num_labels,
+    #                     batch_size, max_iterations, confidence)
+
+    # inputs, targets = generate_data(test_data, test_labels, samples=1, targeted=True, #true  
+    #                                 start=0, inception=False)
+
+    print("OOOO111111111111111111111111111111OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+    print((test_data.shape))
+    print((test_labels.shape))
+    print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO111111111111111111111111111111OOOOOOOOOOOOOOOOOOOOOO")
     
-    print("Weigths are NOOOOT loaded from disk") 
-    model.load_weights(model_name)
-    print("Weigths are loaded from disk")
+    timestart = time.time()
+    # adv = attack.attack(inputs, targets)
+    adv = attack.attack(test_data, test_labels)
+    timeend = time.time()
+    
+    print("Took",timeend-timestart,"seconds to run",len(test_labels),"samples.")
 
-    model.summary()
-
-    with tf.compat.v1.Session() as sess:
-
-        attack = CarliniL2(sess, model, image_size, num_channels, num_labels,
-                           batch_size, max_iterations, confidence)
-
-        inputs, targets = test_attack.generate_data(test_data, test_labels, samples=1, targeted=True, #true
-                                        start=0, inception=False)
-
-        # print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
-        # print((inputs.shape))
-        # print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+    for i in range(len(adv)):
+        print("Valid:")
+        show(test_data[i])
+        print("Adversarial:")
+        show(adv[i])
         
-        timestart = time.time()
-        adv = attack.attack(inputs, targets)
-        timeend = time.time()
-        
-        print("Took",timeend-timestart,"seconds to run",len(inputs),"samples.")
+        print("Classification:", model_fake(adv[i:i+1]))
 
-        for i in range(len(adv)):
-            print("Valid:")
-            test_attack.show(inputs[i])
-            print("Adversarial:")
-            test_attack.show(adv[i])
-            
-            print("Classification:", model(adv[i:i+1]))
+        print("Total distortion:", np.sum((adv[i]-test_data[i])**2)**.5)
+        # sess.close()
 
-            print("Total distortion:", np.sum((adv[i]-inputs[i])**2)**.5)
+    return adv
 
 
 #load data once
 data_set = load_MNIST_data()
 print("done 1 : data loaded -----------------------")
+
 
 # #first train the stochastic model
 # train_main(data_set, train_1_test_2=1, is_SC=True, params=params)
@@ -233,10 +297,31 @@ print("done 1 : data loaded -----------------------")
 # train_main(data_set, train_1_test_2=1, is_SC=False, params=params)
 # print("done 3 : nn trained -----------------------")
 
+# #test the stochastic model
+# train_main(data_set, train_1_test_2=2, is_SC=True, params=params)
+# print("done 4 : SC tested -----------------------")
 
-train_main(data_set, train_1_test_2=2, is_SC=True, params=params)
-train_main(data_set, train_1_test_2=2, is_SC=False, params=params)
-# #apply attack
-# _, _, test_data, test_labels, shape_= data_set
-# attack_main(shape_, test_data, test_labels, is_SC=False)
+#test binary model now
+# train_main(data_set, train_1_test_2=2, is_SC=False, params=params)
+# print("done 5 : nn tested -----------------------")
 
+
+#apply attack
+with tf.compat.v1.Session() as sess_:
+    _, _, test_data, test_labels, shape_= data_set
+    adv_test_data = attack_main(sess_, shape_, test_data, test_labels, is_SC=False)
+    print("done 6 : attack applied -----------------------")
+    sess_.close()
+
+
+print(len(data_set[0]))
+#test SC network, after attack being applied
+train_main((data_set[0], data_set[1], adv_test_data, data_set[3], data_set[4]), 
+           train_1_test_2=2, is_SC=True, params=params)
+print("done 7 : SC tested after attack -----------------------")
+
+
+#test binary network, after attack being applied
+# train_main((data_set[0], data_set[1], adv_test_data, adv_test_labels, shape_), 
+#            train_1_test_2=2, is_SC=False, params=params)
+# print("done 8 : SC tested after attack -----------------------")
