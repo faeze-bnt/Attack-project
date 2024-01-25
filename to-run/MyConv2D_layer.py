@@ -84,7 +84,7 @@ class MyConv2D(layers.Layer):
             A_stream = Stochastic_SNG_A(x, self.Stream_Length, self.Sobol_num1, 0)
             B_stream = Stochastic_SNG_B(kernels, self.Stream_Length, self.Sobol_num2)
             #-------------- Stochastic convolution
-            output1 = K.conv2d(A_stream, B_stream, padding="VALID")
+            output1 = K.conv2d(A_stream, B_stream, padding='valid')
             #-------------------------------------------------------------------------------
             output = Quantizer(output1/self.Stream_Length, self.Width)
         output = K.relu(output + self.bias)

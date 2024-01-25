@@ -1,10 +1,10 @@
 
-from sklearn.metrics import confusion_matrix
+# from sklearn.metrics import confusion_matrix, precision_score, recall_score
 import numpy as np
+from sklearn import metrics
 
 import matplotlib.pyplot as plt
 import seaborn as sns; sns.set()  # For pretty confusion matrix
-
 
 def one_hot_to_binary(one_hot_array):
   binary_data = []
@@ -20,18 +20,32 @@ class Conf_matrix:
     true_label = one_hot_to_binary(trues)
     pred_label = one_hot_to_binary(predictions)
 
-    c_matrix = confusion_matrix(true_label, pred_label)
-    # print(c_matrix)
+    # Generate confusion matrix
+    c_matrix = metrics.confusion_matrix(true_label, pred_label)
 
-    # drae a plot to visually see the results.
+    # draw and save its plot 
     fig, ax = plt.subplots()
-    sns.heatmap(c_matrix, annot=False, ax=ax, cmap='Blues')  # Annotate the cells with the numeric values
-
+    sns.heatmap(c_matrix, annot=False, ax=ax, cmap='Blues')  
 
     ax.set_xlabel('Predicted labels')
     ax.set_ylabel('True labels')
     ax.set_title('Confusion Matrix')
     plt.savefig(plt_file)
+
+    # Calculate  PPV (Precision) and sensitivity for each class
+    precision = metrics.precision_score(true_label, pred_label, average='macro')
+    sensitivity = metrics.recall_score(true_label, pred_label, average='macro')
+    print("Sensitivity (True Positive Rate):", sensitivity)
+    print("PPV (Precision):", precision)
+
+    # Micro-average F1 score
+    f1_micro = metrics.f1_score(true_label, pred_label, average='macro')
+    print("Micro-average F1 score:", f1_micro)
+
+
+
+
+
 
 
 
