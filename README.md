@@ -1,6 +1,7 @@
 # Attack-project
 
-
+Requirements should be installed first,
+Attacks sre: FGSM attack, CW attack(files not mentioned as fgsm, include cw attack)
 
 For the latest version of the code:
 
