@@ -58,3 +58,7 @@ tensorflow-model-optimization
 termcolor
 torch
 Werkzeug
+matplotlib
+scikit-learn
+torch
+
